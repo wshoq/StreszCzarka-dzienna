@@ -15,6 +15,9 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
+# ✅ Dodaj to:
+RUN npm install -g npm@latest
+
 RUN npm ci
 
 COPY . .
