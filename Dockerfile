@@ -15,12 +15,10 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-# Use npm ci to install dependencies cleanly
 RUN npm ci
 
 COPY . .
 
-# Ensure Playwright's dependencies and Chromium are installed
 RUN npx playwright install chromium --with-deps
 
 CMD ["node", "index.js"]
