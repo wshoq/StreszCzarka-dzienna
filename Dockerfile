@@ -1,7 +1,5 @@
-# Używamy wcześniejszej wersji Playwright z Node 20 (kompatybilny z better-sqlite3)
 FROM mcr.microsoft.com/playwright:v1.42.1-jammy
 
-# Instalujemy narzędzia do kompilacji native modules
 RUN apt-get update && apt-get install -y \
   build-essential \
   python3 \
@@ -16,7 +14,8 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-RUN npm install -g npm@latest
+# ❌ Tę linijkę usuwamy
+# RUN npm install -g npm@latest
 
 RUN npm ci
 
