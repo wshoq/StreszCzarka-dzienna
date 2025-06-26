@@ -71,7 +71,7 @@ app.post("/extract", async (req, res) => {
   let browser;
   try {
     browser = await chromium.launch({
-      headless: true,
+      headless: true, // na Render headless musi być true
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
@@ -118,8 +118,7 @@ app.get("/scrape-latest-one", async (req, res) => {
   let browser;
   try {
     browser = await chromium.launch({
-      headless: false,
-      slowMo: 1000, // spowolnij aby widzieć proces
+      headless: true, // tutaj też headless true, bo Render bez GUI
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
@@ -135,7 +134,7 @@ app.get("/scrape-latest-one", async (req, res) => {
       timeout: 60000,
     });
 
-    await page.waitForTimeout(3000); // daj czas, by się przyjrzeć
+    await page.waitForTimeout(3000);
 
     // Znajdź link do najnowszego artykułu
     const articleUrl = await page.$eval(
@@ -164,7 +163,7 @@ app.get("/scrape-latest-one", async (req, res) => {
 
     const title = await articlePage.title();
 
-    // Pobieramy treść artykułu - tu możesz uprościć jeśli chcesz tylko tytuł i link
+    // Jeśli chcesz uprościć i zwracać tylko link + tytuł, to poniżej usuń content lub zostaw pusty string
     const paragraphs = await articlePage.$$eval(".article__body p", ps =>
       ps.map(p => p.innerText.trim()).filter(Boolean)
     );
@@ -175,7 +174,7 @@ app.get("/scrape-latest-one", async (req, res) => {
     res.json({
       url: articleUrl,
       title,
-      content,
+      content, // lub content: "" jeśli chcesz tylko link + tytuł
     });
 
     await articlePage.close();
