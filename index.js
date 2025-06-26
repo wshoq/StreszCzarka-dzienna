@@ -55,6 +55,7 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+// --- extract endpoint - pobiera title i cały tekst strony z podanego URL ---
 app.post("/extract", async (req, res) => {
   const { url } = req.body;
 
@@ -98,6 +99,8 @@ app.post("/extract", async (req, res) => {
     const title = await page.title();
     const content = await page.evaluate(() => document.body.innerText);
 
+    addUrlToHistory(url);
+
     res.json({
       title,
       content: content.trim(),
@@ -110,13 +113,13 @@ app.post("/extract", async (req, res) => {
   }
 });
 
-// NOWY ENDPOINT — pobiera jeden najnowszy artykuł i zapamiętuje go w bazie
+// --- scrape-latest-one - dla https://www.world-nuclear-news.org ---
 app.get("/scrape-latest-one", async (req, res) => {
   let browser;
-
   try {
     browser = await chromium.launch({
-      headless: true,
+      headless: false,
+      slowMo: 1000, // spowolnij aby widzieć proces
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
@@ -126,16 +129,18 @@ app.get("/scrape-latest-one", async (req, res) => {
     });
     const page = await context.newPage();
 
+    console.log("🌐 Otwieram stronę główną WNN...");
     await page.goto("https://www.world-nuclear-news.org", {
       waitUntil: "domcontentloaded",
       timeout: 60000,
     });
 
-    // Pobierz element <img> z selektora, a potem znajdź rodzica <a> i pobierz href
+    await page.waitForTimeout(3000); // daj czas, by się przyjrzeć
+
+    // Znajdź link do najnowszego artykułu
     const articleUrl = await page.$eval(
       "div.news_list_image:nth-child(2) > img:nth-child(1)",
       (img) => {
-        // Przechodzimy do rodzica <a>
         const link = img.closest("a");
         return link ? link.href : null;
       }
@@ -145,21 +150,24 @@ app.get("/scrape-latest-one", async (req, res) => {
       return res.status(404).json({ error: "Nie znaleziono linku do artykułu" });
     }
 
+    console.log("📰 Najnowszy artykuł:", articleUrl);
+
     const recentUrls = getLastUrls();
     if (recentUrls.includes(articleUrl)) {
-      return res.status(200).json({ message: "Najnowszy artykuł już był przetworzony", url: articleUrl });
+      return res.status(200).json({ message: "Najnowszy artykuł już był", url: articleUrl });
     }
 
     const articlePage = await context.newPage();
+    console.log("➡️ Przechodzę do artykułu...");
     await articlePage.goto(articleUrl, { waitUntil: "domcontentloaded" });
+    await articlePage.waitForTimeout(3000);
 
     const title = await articlePage.title();
 
-    // Pobierz wszystkie paragrafy artykułu
+    // Pobieramy treść artykułu - tu możesz uprościć jeśli chcesz tylko tytuł i link
     const paragraphs = await articlePage.$$eval(".article__body p", ps =>
       ps.map(p => p.innerText.trim()).filter(Boolean)
     );
-
     const content = paragraphs.join("\n\n");
 
     addUrlToHistory(articleUrl);
@@ -195,7 +203,7 @@ app.post("/remember", (req, res) => {
   res.json({ message: "URL zapisany" });
 });
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Serwer działa na http://localhost:${PORT}`);
 });
