@@ -110,6 +110,65 @@ app.post("/extract", async (req, res) => {
   }
 });
 
+// NOWY ENDPOINT — pobiera jeden najnowszy artykuł i zapamiętuje go w bazie
+app.get("/scrape-latest-one", async (req, res) => {
+  let browser;
+
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    const context = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    });
+    const page = await context.newPage();
+
+    await page.goto("https://www.world-nuclear-news.org/Articles", {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+
+    await page.waitForSelector("article a");
+
+    // Znajdź pierwszy link do artykułu
+    const articleUrl = await page.$eval("article a", (a) => a.href);
+
+    const recentUrls = getLastUrls();
+    if (recentUrls.includes(articleUrl)) {
+      return res.status(200).json({ message: "Najnowszy artykuł już był przetworzony", url: articleUrl });
+    }
+
+    const articlePage = await context.newPage();
+    await articlePage.goto(articleUrl, { waitUntil: "domcontentloaded" });
+
+    const title = await articlePage.title();
+    const paragraphs = await articlePage.$$eval(".article__body p", ps =>
+      ps.map(p => p.innerText.trim()).filter(Boolean)
+    );
+
+    const content = paragraphs.join("\n\n");
+
+    // Zapisz URL w bazie
+    addUrlToHistory(articleUrl);
+
+    res.json({
+      url: articleUrl,
+      title,
+      content,
+    });
+
+    await articlePage.close();
+  } catch (err) {
+    console.error("❌ Błąd podczas scrapowania:", err);
+    res.status(500).json({ error: `Błąd scrapowania: ${err.message}` });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+
 app.post("/remember", (req, res) => {
   const { url } = req.body;
 
