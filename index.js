@@ -229,4 +229,6 @@ const PORT = process.env.PORT || 3000;
 console.log("🚀 Using PORT from env:", process.env.PORT);
 app.listen(PORT, () => {
   console.log(`🚀 Serwer działa na http://localhost:${PORT}`);
+
+  console.log("✨ Koniec pliku index.js");
 });
