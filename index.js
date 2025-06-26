@@ -126,17 +126,24 @@ app.get("/scrape-latest-one", async (req, res) => {
     });
     const page = await context.newPage();
 
-    await page.goto("https://www.world-nuclear-news.org/Articles", {
+    await page.goto("https://www.world-nuclear-news.org", {
       waitUntil: "domcontentloaded",
       timeout: 60000,
     });
 
-    // Używamy nowego selektora, który podałeś, ale musimy pobrać URL z elementu <a>, a nie <div>
-    // Znajdujemy element <a> na podstawie selektora dla <div> i idziemy do rodzica <a>
+    // Pobierz element <img> z selektora, a potem znajdź rodzica <a> i pobierz href
     const articleUrl = await page.$eval(
-      "div.col-xl-2:nth-child(2) > div:nth-child(1) > a:nth-child(1)",
-      (a) => a.href
+      "div.news_list_image:nth-child(2) > img:nth-child(1)",
+      (img) => {
+        // Przechodzimy do rodzica <a>
+        const link = img.closest("a");
+        return link ? link.href : null;
+      }
     );
+
+    if (!articleUrl) {
+      return res.status(404).json({ error: "Nie znaleziono linku do artykułu" });
+    }
 
     const recentUrls = getLastUrls();
     if (recentUrls.includes(articleUrl)) {
@@ -147,6 +154,8 @@ app.get("/scrape-latest-one", async (req, res) => {
     await articlePage.goto(articleUrl, { waitUntil: "domcontentloaded" });
 
     const title = await articlePage.title();
+
+    // Pobierz wszystkie paragrafy artykułu
     const paragraphs = await articlePage.$$eval(".article__body p", ps =>
       ps.map(p => p.innerText.trim()).filter(Boolean)
     );
