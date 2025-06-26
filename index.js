@@ -113,8 +113,12 @@ app.post("/extract", async (req, res) => {
   }
 });
 
+// Log przy rejestracji endpointu
+console.log("🏷️ REGISTERED GET /scrape-latest-one");
+
 // --- scrape-latest-one - dla https://www.world-nuclear-news.org ---
 app.get("/scrape-latest-one", async (req, res) => {
+  console.log("🏷️ SCRAPE-LATEST-ONE endpoint hit");
   let browser;
   try {
     browser = await chromium.launch({
@@ -163,7 +167,6 @@ app.get("/scrape-latest-one", async (req, res) => {
 
     const title = await articlePage.title();
 
-    // Jeśli chcesz uprościć i zwracać tylko link + tytuł, to poniżej usuń content lub zostaw pusty string
     const paragraphs = await articlePage.$$eval(".article__body p", ps =>
       ps.map(p => p.innerText.trim()).filter(Boolean)
     );
@@ -174,7 +177,7 @@ app.get("/scrape-latest-one", async (req, res) => {
     res.json({
       url: articleUrl,
       title,
-      content, // lub content: "" jeśli chcesz tylko link + tytuł
+      content,
     });
 
     await articlePage.close();
