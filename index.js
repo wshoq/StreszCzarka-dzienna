@@ -131,10 +131,12 @@ app.get("/scrape-latest-one", async (req, res) => {
       timeout: 60000,
     });
 
-    await page.waitForSelector("article a");
-
-    // Znajdź pierwszy link do artykułu
-    const articleUrl = await page.$eval("article a", (a) => a.href);
+    // Używamy nowego selektora, który podałeś, ale musimy pobrać URL z elementu <a>, a nie <div>
+    // Znajdujemy element <a> na podstawie selektora dla <div> i idziemy do rodzica <a>
+    const articleUrl = await page.$eval(
+      "div.col-xl-2:nth-child(2) > div:nth-child(1) > a:nth-child(1)",
+      (a) => a.href
+    );
 
     const recentUrls = getLastUrls();
     if (recentUrls.includes(articleUrl)) {
@@ -151,7 +153,6 @@ app.get("/scrape-latest-one", async (req, res) => {
 
     const content = paragraphs.join("\n\n");
 
-    // Zapisz URL w bazie
     addUrlToHistory(articleUrl);
 
     res.json({
