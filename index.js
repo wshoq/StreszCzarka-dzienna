@@ -9,6 +9,8 @@ app.use(express.json());
 const db = new Database(path.join(__dirname, "last.db"));
 const MAX_URLS = 20;
 
+console.log("🏷️ Starting server...");
+
 // Tworzymy tabelę, jeśli nie istnieje
 db.prepare(`
   CREATE TABLE IF NOT EXISTS urls (
@@ -51,27 +53,32 @@ function addUrlToHistory(url) {
   }
 }
 
+// Endpoint health check
 app.get("/health", (req, res) => {
+  console.log("🏷️ /health endpoint hit");
   res.json({ status: "ok" });
 });
 
-// --- extract endpoint - pobiera title i cały tekst strony z podanego URL ---
+// POST /extract
 app.post("/extract", async (req, res) => {
+  console.log("🏷️ /extract endpoint hit");
   const { url } = req.body;
 
   if (!url) {
+    console.warn("⚠️ Brak URL w /extract");
     return res.status(400).json({ error: "Brak URL w żądaniu" });
   }
 
   const recentUrls = getLastUrls();
   if (recentUrls.includes(url)) {
+    console.log("ℹ️ URL już był — pomijam");
     return res.status(200).json({ message: "URL już był — pomijam" });
   }
 
   let browser;
   try {
     browser = await chromium.launch({
-      headless: true, // na Render headless musi być true
+      headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
@@ -113,16 +120,15 @@ app.post("/extract", async (req, res) => {
   }
 });
 
-// Log przy rejestracji endpointu
 console.log("🏷️ REGISTERED GET /scrape-latest-one");
 
-// --- scrape-latest-one - dla https://www.world-nuclear-news.org ---
+// GET /scrape-latest-one
 app.get("/scrape-latest-one", async (req, res) => {
   console.log("🏷️ SCRAPE-LATEST-ONE endpoint hit");
   let browser;
   try {
     browser = await chromium.launch({
-      headless: true, // tutaj też headless true, bo Render bez GUI
+      headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
@@ -140,7 +146,6 @@ app.get("/scrape-latest-one", async (req, res) => {
 
     await page.waitForTimeout(3000);
 
-    // Znajdź link do najnowszego artykułu
     const articleUrl = await page.$eval(
       "div.news_list_image:nth-child(2) > img:nth-child(1)",
       (img) => {
@@ -150,6 +155,7 @@ app.get("/scrape-latest-one", async (req, res) => {
     );
 
     if (!articleUrl) {
+      console.warn("⚠️ Nie znaleziono linku do artykułu");
       return res.status(404).json({ error: "Nie znaleziono linku do artykułu" });
     }
 
@@ -157,6 +163,7 @@ app.get("/scrape-latest-one", async (req, res) => {
 
     const recentUrls = getLastUrls();
     if (recentUrls.includes(articleUrl)) {
+      console.log("ℹ️ Najnowszy artykuł już był");
       return res.status(200).json({ message: "Najnowszy artykuł już był", url: articleUrl });
     }
 
@@ -190,14 +197,17 @@ app.get("/scrape-latest-one", async (req, res) => {
 });
 
 app.post("/remember", (req, res) => {
+  console.log("🏷️ /remember endpoint hit");
   const { url } = req.body;
 
   if (!url) {
+    console.warn("⚠️ Brak URL w /remember");
     return res.status(400).json({ error: "Brak URL" });
   }
 
   const recentUrls = getLastUrls();
   if (recentUrls.includes(url)) {
+    console.log("ℹ️ URL już zapisany");
     return res.status(200).json({ message: "URL już zapisany" });
   }
 
@@ -206,6 +216,7 @@ app.post("/remember", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+console.log("🚀 Using PORT from env:", process.env.PORT);
 app.listen(PORT, () => {
   console.log(`🚀 Serwer działa na http://localhost:${PORT}`);
 });
