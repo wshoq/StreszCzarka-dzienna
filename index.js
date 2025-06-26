@@ -6,7 +6,6 @@ const path = require("path");
 const app = express();
 app.use(express.json());
 
-// Middleware logujący każdy request
 app.use((req, res, next) => {
   console.log(`🔥 ${req.method} ${req.url}`);
   next();
@@ -17,7 +16,6 @@ const MAX_URLS = 20;
 
 console.log("🏷️ Starting server...");
 
-// Tworzymy tabelę, jeśli nie istnieje
 db.prepare(`
   CREATE TABLE IF NOT EXISTS urls (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,7 +37,6 @@ function getLastUrls() {
     ORDER BY added_at DESC
     LIMIT ?
   `).all(MAX_URLS);
-
   return rows.map(row => row.url);
 }
 
@@ -60,13 +57,13 @@ function addUrlToHistory(url) {
   }
 }
 
-// Endpoint health check
+// 🔧 Endpoint health check
 app.get("/health", (req, res) => {
   console.log("🏷️ /health endpoint hit");
   res.json({ status: "ok" });
 });
 
-// POST /extract
+// 🔍 POST /extract
 app.post("/extract", async (req, res) => {
   console.log("🏷️ /extract endpoint hit");
   const { url } = req.body;
@@ -128,9 +125,7 @@ app.post("/extract", async (req, res) => {
   }
 });
 
-console.log("🏷️ REGISTERED GET /scrape-latest-one");
-
-// GET /scrape-latest-one
+// 📰 GET /scrape-latest-one
 app.get("/scrape-latest-one", async (req, res) => {
   console.log("🏷️ SCRAPE-LATEST-ONE endpoint hit");
   let browser;
@@ -181,7 +176,6 @@ app.get("/scrape-latest-one", async (req, res) => {
     await articlePage.waitForTimeout(3000);
 
     const title = await articlePage.title();
-
     const paragraphs = await articlePage.$$eval(".article__body p", ps =>
       ps.map(p => p.innerText.trim()).filter(Boolean)
     );
@@ -205,6 +199,7 @@ app.get("/scrape-latest-one", async (req, res) => {
   }
 });
 
+// 🧠 POST /remember
 app.post("/remember", (req, res) => {
   console.log("🏷️ /remember endpoint hit");
   const { url } = req.body;
@@ -225,10 +220,11 @@ app.post("/remember", (req, res) => {
   res.json({ message: "URL zapisany" });
 });
 
+// 🚀 Serwer nasłuchuje na 0.0.0.0
 const PORT = process.env.PORT || 3000;
-console.log("🚀 Using PORT from env:", process.env.PORT);
-app.listen(PORT, () => {
-  console.log(`🚀 Serwer działa na http://localhost:${PORT}`);
+const HOST = process.env.HOST || "0.0.0.0";
 
+app.listen(PORT, HOST, () => {
+  console.log(`🚀 Serwer działa na http://${HOST}:${PORT}`);
   console.log("✨ Koniec pliku index.js");
 });
