@@ -6,6 +6,12 @@ const path = require("path");
 const app = express();
 app.use(express.json());
 
+// Middleware logujący każdy request
+app.use((req, res, next) => {
+  console.log(`🔥 ${req.method} ${req.url}`);
+  next();
+});
+
 const db = new Database(path.join(__dirname, "last.db"));
 const MAX_URLS = 20;
 
@@ -50,6 +56,7 @@ function addUrlToHistory(url) {
       )
     `);
     deleteOld.run(MAX_URLS);
+    console.log(`🧹 Usuń stare wpisy, zostawiam max ${MAX_URLS}`);
   }
 }
 
@@ -107,6 +114,7 @@ app.post("/extract", async (req, res) => {
     const content = await page.evaluate(() => document.body.innerText);
 
     addUrlToHistory(url);
+    console.log(`✅ URL dodany do historii: ${url}`);
 
     res.json({
       title,
@@ -180,6 +188,7 @@ app.get("/scrape-latest-one", async (req, res) => {
     const content = paragraphs.join("\n\n");
 
     addUrlToHistory(articleUrl);
+    console.log(`✅ Artykuł dodany do historii: ${articleUrl}`);
 
     res.json({
       url: articleUrl,
@@ -212,6 +221,7 @@ app.post("/remember", (req, res) => {
   }
 
   addUrlToHistory(url);
+  console.log(`✅ URL zapisany: ${url}`);
   res.json({ message: "URL zapisany" });
 });
 
