@@ -147,7 +147,10 @@ app.get("/scrape-latest-one", async (req, res) => {
       timeout: 60000,
     });
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(10000); // daj renderowi czas
+
+    const html = await page.content();
+    console.log("📄 HTML strony (początek):\n", html.slice(0, 2000)); // loguj pierwszy kawałek
 
     const articleUrl = await page.$eval(
       "div.news_list_image:nth-child(2) > img:nth-child(1)",
@@ -172,8 +175,8 @@ app.get("/scrape-latest-one", async (req, res) => {
 
     const articlePage = await context.newPage();
     console.log("➡️ Przechodzę do artykułu...");
-    await articlePage.goto(articleUrl, { waitUntil: "domcontentloaded" });
-    await articlePage.waitForTimeout(3000);
+    await articlePage.goto(articleUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await articlePage.waitForTimeout(10000);
 
     const title = await articlePage.title();
     const paragraphs = await articlePage.$$eval(".article__body p", ps =>
