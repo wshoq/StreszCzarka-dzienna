@@ -6,16 +6,10 @@ const path = require("path");
 const app = express();
 app.use(express.json());
 
-app.use((req, res, next) => {
-  console.log(`🔥 ${req.method} ${req.url}`);
-  next();
-});
-
 const db = new Database(path.join(__dirname, "last.db"));
 const MAX_URLS = 20;
 
-console.log("🏷️ Starting server...");
-
+// Tworzymy tabelę, jeśli nie istnieje
 db.prepare(`
   CREATE TABLE IF NOT EXISTS urls (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,6 +31,7 @@ function getLastUrls() {
     ORDER BY added_at DESC
     LIMIT ?
   `).all(MAX_URLS);
+
   return rows.map(row => row.url);
 }
 
@@ -53,29 +48,22 @@ function addUrlToHistory(url) {
       )
     `);
     deleteOld.run(MAX_URLS);
-    console.log(`🧹 Usuń stare wpisy, zostawiam max ${MAX_URLS}`);
   }
 }
 
-// 🔧 Endpoint health check
 app.get("/health", (req, res) => {
-  console.log("🏷️ /health endpoint hit");
   res.json({ status: "ok" });
 });
 
-// 🔍 POST /extract
 app.post("/extract", async (req, res) => {
-  console.log("🏷️ /extract endpoint hit");
   const { url } = req.body;
 
   if (!url) {
-    console.warn("⚠️ Brak URL w /extract");
     return res.status(400).json({ error: "Brak URL w żądaniu" });
   }
 
   const recentUrls = getLastUrls();
   if (recentUrls.includes(url)) {
-    console.log("ℹ️ URL już był — pomijam");
     return res.status(200).json({ message: "URL już był — pomijam" });
   }
 
@@ -110,9 +98,6 @@ app.post("/extract", async (req, res) => {
     const title = await page.title();
     const content = await page.evaluate(() => document.body.innerText);
 
-    addUrlToHistory(url);
-    console.log(`✅ URL dodany do historii: ${url}`);
-
     res.json({
       title,
       content: content.trim(),
@@ -125,109 +110,23 @@ app.post("/extract", async (req, res) => {
   }
 });
 
-// 📰 GET /scrape-latest-one
-app.get("/scrape-latest-one", async (req, res) => {
-  console.log("🏷️ SCRAPE-LATEST-ONE endpoint hit");
-  let browser;
-  try {
-    browser = await chromium.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-
-    const context = await browser.newContext({
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    });
-    const page = await context.newPage();
-
-    console.log("🌐 Otwieram stronę główną WNN...");
-    await page.goto("https://www.world-nuclear-news.org", {
-      waitUntil: "domcontentloaded",
-      timeout: 60000,
-    });
-
-    await page.waitForTimeout(10000); // daj renderowi czas
-
-    const html = await page.content();
-    console.log("📄 HTML strony (początek):\n", html.slice(0, 2000)); // loguj pierwszy kawałek
-
-    const articleUrl = await page.$eval(
-      "div.news_list_image:nth-child(2) > img:nth-child(1)",
-      (img) => {
-        const link = img.closest("a");
-        return link ? link.href : null;
-      }
-    );
-
-    if (!articleUrl) {
-      console.warn("⚠️ Nie znaleziono linku do artykułu");
-      return res.status(404).json({ error: "Nie znaleziono linku do artykułu" });
-    }
-
-    console.log("📰 Najnowszy artykuł:", articleUrl);
-
-    const recentUrls = getLastUrls();
-    if (recentUrls.includes(articleUrl)) {
-      console.log("ℹ️ Najnowszy artykuł już był");
-      return res.status(200).json({ message: "Najnowszy artykuł już był", url: articleUrl });
-    }
-
-    const articlePage = await context.newPage();
-    console.log("➡️ Przechodzę do artykułu...");
-    await articlePage.goto(articleUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await articlePage.waitForTimeout(10000);
-
-    const title = await articlePage.title();
-    const paragraphs = await articlePage.$$eval(".article__body p", ps =>
-      ps.map(p => p.innerText.trim()).filter(Boolean)
-    );
-    const content = paragraphs.join("\n\n");
-
-    addUrlToHistory(articleUrl);
-    console.log(`✅ Artykuł dodany do historii: ${articleUrl}`);
-
-    res.json({
-      url: articleUrl,
-      title,
-      content,
-    });
-
-    await articlePage.close();
-  } catch (err) {
-    console.error("❌ Błąd podczas scrapowania:", err);
-    res.status(500).json({ error: `Błąd scrapowania: ${err.message}` });
-  } finally {
-    if (browser) await browser.close();
-  }
-});
-
-// 🧠 POST /remember
 app.post("/remember", (req, res) => {
-  console.log("🏷️ /remember endpoint hit");
   const { url } = req.body;
 
   if (!url) {
-    console.warn("⚠️ Brak URL w /remember");
     return res.status(400).json({ error: "Brak URL" });
   }
 
   const recentUrls = getLastUrls();
   if (recentUrls.includes(url)) {
-    console.log("ℹ️ URL już zapisany");
     return res.status(200).json({ message: "URL już zapisany" });
   }
 
   addUrlToHistory(url);
-  console.log(`✅ URL zapisany: ${url}`);
   res.json({ message: "URL zapisany" });
 });
 
-// 🚀 Serwer nasłuchuje na 0.0.0.0
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || "0.0.0.0";
-
-app.listen(PORT, HOST, () => {
-  console.log(`🚀 Serwer działa na http://${HOST}:${PORT}`);
-  console.log("✨ Koniec pliku index.js");
+app.listen(PORT, () => {
+  console.log(`🚀 Serwer działa na http://localhost:${PORT}`);
 });
